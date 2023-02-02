@@ -17,16 +17,56 @@ const config = JSON.parse(Deno.readTextFileSync('./config.json'));
 const PORT = parseInt(Deno.env.get('PORT')) || 3000;
 
 // HTTP Request Handler
-const handler = (request: Request): Response => {
+const handler = async (request: Request): Promise<Response> => {
     const url = new URL(request.url);
+    if (request.method === 'OPTIONS') return new Response('OK', { status: 200, headers: {'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization'} });
     switch (url.pathname) {
         // deno-lint-ignore no-case-declarations
         case '/oauth':
-            // @ts-expect-error: Tbh, idk why this is an error
-            const {message, code} = oauthToEmail(url.searchParams.get('app'), url.searchParams.get('code'));
-            return new Response(message, { status: code });
+            const {code, message}: {code: number, message?:string} = oauthToEmail(url.searchParams.get('app'), url.searchParams.get('code'));
+            //return new Response(message, { status: code, headers: {'Access-Control-Allow-Origin': '*' } });
+            console.log(code + ' ' + message)
+            switch (code) {
+                case 200:
+                    return Response.redirect(`${config.frontend}/welcome.html?token=${message}`, 302);
+                case 409:
+                    return Response.redirect(`${config.frontend}/index.html`, 302);
+                default:
+                    return Response.redirect(`${config.frontend}/login.html`, 302)
+            };
+        // deno-lint-ignore no-case-declarations
+        case '/user':
+            let id: string|number|null = url.searchParams.get('id');
+            const token: string = request.headers.get('Authorization') || '';
+            if (!id) return new Response('Invalid request', { status: 400, headers: {'Access-Control-Allow-Origin': '*' } });
+            if (!await userDB.findOne({token: token })) return new Response('Invalid token', { status: 401, headers: {'Access-Control-Allow-Origin': '*' } });
+            let me = false;
+            if (id === 'me') {
+                // @ts-ignore: Id cannot be null
+                id = (await userDB.findOne({token: token })).id.toString();
+                me = true;
+            }
+            id = parseInt(id as string);
+
+            const user = await userDB.findOne({id: id});
+
+            const userObject = {
+                // @ts-expect-error: id is either null or a string
+                id: user.id,
+                // @ts-expect-error: id is either null or a string
+                name: user.name,
+                // @ts-expect-error: id is either null or a string
+                avatarUrl: user.avatarUrl
+            }
+
+            if (me) {
+                // @ts-expect-error: id is either null or a string
+                userObject.email = user.email;
+            }
+
+            return new Response(JSON.stringify(userObject), { status: 200, headers: {'Access-Control-Allow-Origin': '*' } });
     }
-    return new Response('Not Found', { status: 404 });
+    return new Response('Not Found', { status: 404, headers: {'Access-Control-Allow-Origin': '*' } });
 }
 
 // Run the HTTP Server
@@ -37,7 +77,7 @@ function oauthToEmail(app: string, code: string) {
         case 'github':
             return handleGitHubOauth(code);
         default:
-            return {message: 'Invalid app', code: 400};
+            return {code: 400};
     }
 }
 
@@ -67,7 +107,7 @@ async function handleGitHubOauth(code: string) {
         const userData = await userResponse.json();
         
         if (await userDB.findOne({ email: userData.email })) {
-            return {message: 'User already exists', code: 409}
+            return {code: 409};
         }
 
         const token = generateToken([userData.email, userData.login, userData.id.toString(), userData.avatar_url]);
@@ -76,10 +116,11 @@ async function handleGitHubOauth(code: string) {
             id: await userDB.count() + 1,
             email: userData.email,
             name: userData.login,
-            token: token
+            token: token,
+            avatarUrl: `https://source.boringavatars.com/bauhaus/128/${userData.login}`
         });
 
-        return {message: 'OK', code: 200}
+        return {code: 200, message: token};
 }
 
 function shuffle(array: string[]): string[] {
