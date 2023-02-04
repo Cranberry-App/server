@@ -18,14 +18,18 @@ const app = new Application();
 // Middleware
 app.use(oakCors());
 
+app.use(ctx => {
+    console.log(`${Date.now()}: ${ctx.request.method} ${ctx.request.url.href}`);
+});
+
 app.use(async ctx => {
     // Define request variables
     const
         endpoint: string = ctx.request.url.pathname,
         method: types.HTTPMethods = ctx.request.method,
         searchParams: URLSearchParams = new URLSearchParams(ctx.request.url.searchParams),
-        headers: Headers = ctx.request.headers;
-
+        headers: Headers = ctx.request.headers,
+        body: string = await ctx.request.body().value;
     switch (`${method} ${endpoint}`) {
         case 'GET /oauth': {
             switch (searchParams.get('app')) {
@@ -100,6 +104,40 @@ app.use(async ctx => {
 
             ctx.response.status = 200;
             ctx.response.body = JSON.stringify(userObject);
+            break;
+        } case 'PATCH /user': {
+            const token: string = headers.get('Authorization') || '';
+            if (!await userDB.findOne({ token: token })) {
+                ctx.response.status = 401;
+                ctx.response.body = JSON.stringify({ error: 'Unauthorized' });
+                return;
+            }
+            const bodyObject = JSON.parse(body);
+            if (!bodyObject.name || !bodyObject.avatarUrl) {
+                ctx.response.status = 400;
+                ctx.response.body = JSON.stringify({ error: 'Missing or invalid name or avatarUrl' });
+                return;
+            }
+            // Check if a user that is not the user sending the request already has the same name
+            const sameNameUser = await userDB.findOne({ name: bodyObject.name });
+            if (sameNameUser && sameNameUser.token !== token) {
+                ctx.response.status = 409;
+                ctx.response.body = JSON.stringify({ error: 'Name already taken' });
+                return;
+            }
+            userDB.updateOne({ token: token }, {
+                avatarUrl: bodyObject.avatarUrl,
+                name: bodyObject.name
+            });
+            ctx.response.status = 200;
+            // @ts-ignore User can't be null
+            const user: types.User = await userDB.findOne({ token: token });
+            ctx.response.body = JSON.stringify({
+                id: user.id,
+                name: user.name,
+                avatarUrl: user.avatarUrl,
+                email: user.email
+            });
             break;
         } default: {
             ctx.response.status = 404;
