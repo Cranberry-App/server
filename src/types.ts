@@ -19,3 +19,12 @@ export interface Channel {
     messages: number[];
     participants: number[];
 }
+
+export type HTTPMethods = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD' | 'CONNECT' | 'TRACE';
+
+export interface PublicUser {
+    id: number;
+    name: string;
+    avatarUrl: string;
+    email?: string;
+}
