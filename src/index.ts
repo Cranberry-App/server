@@ -1,6 +1,5 @@
 // Module imports
-import { config, Database, Application, oakCors } from '../deps.ts';
-import * as types from './types.ts'
+import { config, Database, Application, oakCors, types } from '../deps.ts';
 import { generateToken, exchangeGitHubCode } from './functions.ts';
 
 // Database initializations
