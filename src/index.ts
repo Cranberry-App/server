@@ -14,10 +14,6 @@ const app = new Application();
 // Middleware
 app.use(oakCors());
 
-app.use(ctx => {
-    console.log(`${Date.now()}: ${ctx.request.method} ${ctx.request.url.href}`);
-});
-
 app.use(async ctx => {
     // Define request variables
     const
@@ -143,7 +139,8 @@ app.use(async ctx => {
             ctx.response.status = 404;
             ctx.response.body = 'Not found';
         }
-    } 
+    }
+    console.log(`${Date.now()}: ${ctx.request.method} ${ctx.request.url.href} - ${ctx.response.status}`);
 });
 
 // Server start
