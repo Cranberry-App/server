@@ -1,4 +1,4 @@
-import { Sha256 } from "../deps.ts";
+import { Sha256, config } from "../deps.ts";
 
 export function shuffle(array: string[]): string[] {
     let currentIndex = array.length,  randomIndex;
@@ -30,4 +30,25 @@ export function generateToken(values: string[]): string {
     tokenArray = tokenArray.join('');
 
     return new Sha256().update(tokenArray).toString();
+}
+
+export async function exchangeGitHubCode(code: string): Promise<string | null> {
+    const url = new URL("https://github.com/login/oauth/access_token");
+    const params = new URLSearchParams();
+    params.append("client_id", config.oauthApps.github.clientId);
+    params.append("client_secret", config.oauthApps.github.clientSecret);
+    params.append("redirect_uri", config.oauthApps.github.redirectUri);
+    params.append("code", code);
+
+    url.search = params.toString();
+
+    const response = await fetch(url, {
+        method: "POST",
+        headers: {
+            Accept: "application/json",
+        },
+    });
+    const data = await response.json();
+
+    return data.access_token || null;
 }

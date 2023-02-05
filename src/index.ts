@@ -1,13 +1,10 @@
 // Module imports
-import { Database, Application, oakCors } from '../deps.ts';
+import { config, Database, Application, oakCors } from '../deps.ts';
 import * as types from './types.ts'
-import { generateToken } from './functions.ts';
+import { generateToken, exchangeGitHubCode } from './functions.ts';
 
 // Database initializations
 const userDB = new Database<types.User>('db/users.json');
-
-// File imports
-const config = JSON.parse(await Deno.readTextFile('./config.json'));
 
 // Variable declarations
 const port = parseInt(Deno.env.get('PORT') || config.port);
@@ -32,6 +29,7 @@ app.use(async ctx => {
         body: string = await ctx.request.body().value;
     switch (`${method} ${endpoint}`) {
         case 'GET /oauth': {
+            ctx.response.status = 302;
             switch (searchParams.get('app')) {
                 case 'github': {
                     const code = searchParams.get('code') || '';
@@ -69,6 +67,7 @@ app.use(async ctx => {
                     ctx.response.redirect(`${config.frontendUrl}/welcome.html?token=${token}`);
                     break;
                 } default: {
+                    // Redirect to the frontend with an error
                     ctx.response.redirect(`${config.frontendUrl}/login.html?error=invalid_app`);
                 }
             }
@@ -149,23 +148,3 @@ app.use(async ctx => {
 // Server start
 await app.listen({ port });
 
-async function exchangeGitHubCode(code: string): Promise<string | null> {
-    const url = new URL('https://github.com/login/oauth/access_token');
-    const params = new URLSearchParams();
-    params.append('client_id', config.oauthApps.github.clientId);
-    params.append('client_secret', config.oauthApps.github.clientSecret);
-    params.append('redirect_uri', config.oauthApps.github.redirectUri);
-    params.append('code', code);
-
-    url.search = params.toString();
-
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json'
-        }
-    });
-    const data = await response.json();
-
-    return data.access_token || null;
-}
