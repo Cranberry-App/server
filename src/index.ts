@@ -28,15 +28,15 @@ app.use(async ctx => {
         headers: Headers = ctx.request.headers,
         body: string = await ctx.request.body().value;
     switch (`${method} ${endpoint}`) {
-        case 'GET /oauth': {
-            ctx.response.status = 302;
+        case 'POST /oauth': {
             switch (searchParams.get('app')) {
                 case 'github': {
-                    const code = searchParams.get('code') || '';
+                    const code = JSON.parse(body).code;
                     // Exchange the OAuth code for a Bearer token
                     const accessToken = await exchangeGitHubCode(code);
                     if (!accessToken) {
-                        ctx.response.redirect(`${config.frontendUrl}/login.html?error=invalid_code`);
+                        ctx.response.status = 400;
+                        ctx.response.body = JSON.stringify({ error: 'Missing or invalid code' });
                     }
                     // Get the user's GitHub profile infos
                     const response = await fetch('https://api.github.com/user', {
@@ -50,7 +50,8 @@ app.use(async ctx => {
 
                     const user = await userDB.findOne({ email: userData.email });
                     if (user) {
-                        ctx.response.redirect(`${config.frontendUrl}/welcome.html?token=${user.token}`);
+                        ctx.response.status = 200;
+                        ctx.response.body = JSON.stringify({ token: user.token });
                         return;
                     }
 
@@ -64,11 +65,12 @@ app.use(async ctx => {
                         avatarUrl: `https://source.boringavatars.com/bauhaus/128/${userData.login}`
                     });
                     
-                    ctx.response.redirect(`${config.frontendUrl}/welcome.html?token=${token}`);
+                    ctx.response.status = 201;
+                    ctx.response.body = JSON.stringify({ token: token });
                     break;
                 } default: {
-                    // Redirect to the frontend with an error
-                    ctx.response.redirect(`${config.frontendUrl}/login.html?error=invalid_app`);
+                    ctx.response.status = 400;
+                    ctx.response.body = JSON.stringify({ error: 'Missing or invalid app' });
                 }
             }
             break;
