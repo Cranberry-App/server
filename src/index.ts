@@ -21,14 +21,15 @@ app.use(async ctx => {
         method: types.HTTPMethods = ctx.request.method,
         searchParams: URLSearchParams = new URLSearchParams(ctx.request.url.searchParams),
         headers: Headers = ctx.request.headers,
-        body: string = await ctx.request.body().value;
+        body: types.RequestBody = await ctx.request.body().value;
     switch (`${method} ${endpoint}`) {
         case 'POST /oauth': {
-            switch (searchParams.get('app')) {
+            const app = body.app;
+            switch (app) {
                 case 'github': {
-                    const code = JSON.parse(body).code;
+                    const code = body.code;
                     // Exchange the OAuth code for a Bearer token
-                    const accessToken = await exchangeGitHubCode(code);
+                    const accessToken = await exchangeGitHubCode(code || '');
                     if (!accessToken) {
                         ctx.response.status = 400;
                         ctx.response.body = JSON.stringify({ error: 'Missing or invalid code' });
@@ -108,14 +109,14 @@ app.use(async ctx => {
                 ctx.response.body = JSON.stringify({ error: 'Unauthorized' });
                 return;
             }
-            const bodyObject = JSON.parse(body);
+            const bodyObject: types.RequestBody = JSON.parse(body as string);
             if (!bodyObject.name || !bodyObject.avatarUrl) {
                 ctx.response.status = 400;
                 ctx.response.body = JSON.stringify({ error: 'Missing or invalid name or avatarUrl' });
                 return;
             }
             // Check if a user that is not the user sending the request already has the same name
-            const sameNameUser = await userDB.findOne({ name: bodyObject.name });
+            const sameNameUser = await userDB.findOne({ name: body.name });
             if (sameNameUser && sameNameUser.token !== token) {
                 ctx.response.status = 409;
                 ctx.response.body = JSON.stringify({ error: 'Name already taken' });
@@ -135,12 +136,22 @@ app.use(async ctx => {
                 email: user.email
             });
             break;
+        } case 'DELETE /user': {
+            const token: string = headers.get('Authorization') || '';
+            if (!await userDB.findOne({ token: token })) {
+                ctx.response.status = 401;
+                ctx.response.body = JSON.stringify({ error: 'Unauthorized' });
+                return;
+            }
+            await userDB.deleteOne({ token: token });
+            ctx.response.status = 200;
+            ctx.response.body = JSON.stringify({ message: 'User deleted' });
+            break;
         } default: {
             ctx.response.status = 404;
             ctx.response.body = 'Not found';
         }
     }
-    console.log(`${Date.now()}: ${ctx.request.method} ${ctx.request.url.href} - ${ctx.response.status}`);
 });
 
 // Server start

@@ -28,3 +28,12 @@ export interface PublicUser {
     avatarUrl: string;
     email?: string;
 }
+
+export interface RequestBody {
+    app?: string;
+    content?: string;
+    code?: string;
+    name?: string;
+    avatarUrl?: string;
+    email?: string;
+}
