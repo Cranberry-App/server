@@ -10,10 +10,10 @@ export interface Message {
     id: number;
     author: number;
     content: string;
-    channel: number;
+    group: number;
 }
 
-export interface Channel {
+export interface Group {
     id: number;
     name: string;
     messages: number[];

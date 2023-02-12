@@ -4,6 +4,7 @@ import { generateToken, exchangeGitHubCode } from './functions.ts';
 
 // Database initializations
 const userDB = new Database<types.User>('db/users.json');
+const groupDB = new Database<types.Group>('db/groups.json');
 
 // Variable declarations
 const port = parseInt(Deno.env.get('PORT') || config.port);
@@ -58,7 +59,7 @@ app.use(async ctx => {
                         email: userData.email,
                         name: userData.login,
                         token: token,
-                        avatarUrl: `https://source.boringavatars.com/bauhaus/128/${userData.login}`
+                        avatarUrl: `https://source.boringavatars.com/bauhaus/400/${userData.login}`
                     });
                     
                     ctx.response.status = 201;
@@ -156,4 +157,3 @@ app.use(async ctx => {
 
 // Server start
 await app.listen({ port });
-
